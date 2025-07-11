@@ -1,225 +1,327 @@
 #!/usr/bin/env python3
 """
-Cursor DevOps Toolkit - CLI for Linear and GitHub operations
+Cursor DevOps Toolkit - CLI for Linear and GitHub operations.
 """
-import asyncio
-import click
+
 import os
-from dotenv import load_dotenv
+import click
+import json
 from loguru import logger
+from typing import Optional
+
 from .integrations.linear_client import LinearClient
 from .integrations.github_client import GitHubClient
-from .utils.types import LinearTask, GitHubPR
-import json
 
-load_dotenv()
 
-# Configure logging based on debug flag
-def setup_logging(debug: bool):
-    logger.remove()
-    level = "DEBUG" if debug else "INFO"
-    logger.add(lambda msg: print(msg, end=""), level=level)
+# Configure logging
+logger.add("cursor-toolkit.log", rotation="10 MB")
+
 
 @click.group()
-@click.option('--debug/--no-debug', default=False, help='Enable debug logging')
-@click.pass_context
-def cli(ctx, debug):
-    """Cursor DevOps Toolkit - Extend Cursor with Linear and GitHub capabilities"""
-    setup_logging(debug)
-    ctx.ensure_object(dict)
-    ctx.obj['debug'] = debug
-
-@cli.group()
-@click.pass_context
-def linear(ctx):
-    """Linear issue tracking commands"""
-    ctx.obj['linear'] = LinearClient(
-        api_key=os.getenv("LINEAR_API_KEY"),
-        team_id=os.getenv("LINEAR_TEAM_ID")
-    )
-
-@linear.command('list')
-@click.option('--state', default='Ready for Dev', help='Filter by state')
-@click.option('--limit', default=10, help='Maximum number of tasks')
-@click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
-@click.pass_context
-def list_tasks_cmd(ctx, state, limit, output_json):
-    """List Linear tasks"""
-    
-    async def list_tasks():
-        client = ctx.obj['linear']
-        
-        # For now, using the existing method that filters by state
-        tasks = await client.get_ready_tasks()
-        
-        if output_json:
-            # Output JSON for Cursor to parse
-            data = [{
-                'id': t.id,
-                'identifier': t.identifier,
-                'title': t.title,
-                'state': t.state,
-                'labels': t.labels,
-                'description': t.description[:200] + '...' if len(t.description) > 200 else t.description
-            } for t in tasks[:limit]]
-            print(json.dumps(data, indent=2))
-        else:
-            # Human-readable output
-            if not tasks:
-                logger.info(f"No tasks found in '{state}' state")
-                return
-                
-            logger.info(f"Found {len(tasks)} tasks in '{state}' state:")
-            for task in tasks[:limit]:
-                print(f"\n📋 {task.identifier}: {task.title}")
-                print(f"   State: {task.state}")
-                print(f"   Labels: {', '.join(task.labels) if task.labels else 'None'}")
-    
-    asyncio.run(list_tasks())
-
-@linear.command('create')
-@click.option('--title', required=True, help='Task title')
-@click.option('--description', required=True, help='Task description')
-@click.option('--state', default='Ready for Dev', help='Initial state')
-@click.option('--labels', multiple=True, help='Labels to add')
-@click.pass_context
-def create_task_cmd(ctx, title, description, state, labels):
-    """Create a new Linear task"""
-    
-    async def create_task():
-        client = ctx.obj['linear']
-        
-        try:
-            task = await client.create_task(
-                title=title,
-                description=description,
-                state_name=state,
-                labels=list(labels) if labels else None
-            )
-            logger.success(f"Created task {task['identifier']}: {task['title']}")
-            logger.info(f"URL: {task['url']}")
-        except Exception as e:
-            logger.error(f"Failed to create task: {e}")
-    
-    asyncio.run(create_task())
-
-@linear.command('update')
-@click.argument('task_id')
-@click.option('--state', help='New state')
-@click.option('--comment', help='Add a comment')
-@click.pass_context
-def update_task_cmd(ctx, task_id, state, comment):
-    """Update a Linear task"""
-    
-    async def update_task():
-        client = ctx.obj['linear']
-        
-        if not state and not comment:
-            logger.error("Provide either --state or --comment")
-            return
-            
-        try:
-            if state:
-                await client.update_task(
-                    task_id=task_id,
-                    state_name=state,
-                    comment=comment or f"Updated to {state}"
-                )
-                logger.success(f"Updated task {task_id}")
-        except Exception as e:
-            logger.error(f"Failed to update task: {e}")
-    
-    asyncio.run(update_task())
-
-@cli.group()
-@click.option('--repo', help='Repository (owner/name)')
-@click.pass_context
-def github(ctx, repo):
-    """GitHub repository commands"""
-    repo_name = repo or os.getenv("GITHUB_REPO")
-    
-    if not repo_name:
-        # Try to get from current project
-        target_project = os.getenv("TARGET_PROJECT")
-        if target_project:
-            repo_env = f"{target_project.upper().replace('-', '_')}_GITHUB_REPO"
-            repo_name = os.getenv(repo_env)
-    
-    if not repo_name:
-        logger.error("No repository specified. Use --repo or set GITHUB_REPO")
-        ctx.exit(1)
-        
-    ctx.obj['github'] = GitHubClient(
-        token=os.getenv("GITHUB_TOKEN"),
-        repo_name=repo_name
-    )
-
-@github.command('branch')
-@click.argument('branch_name')
-@click.option('--base', default='staging', help='Base branch')
-@click.pass_context
-def create_branch(ctx, branch_name, base):
-    """Create a new branch"""
-    client = ctx.obj['github']
-    
-    try:
-        if client.create_branch(branch_name, base):
-            logger.success(f"Created branch '{branch_name}' from '{base}'")
-        else:
-            logger.error("Failed to create branch")
-    except Exception as e:
-        logger.error(f"Error: {e}")
-
-@github.group('pr')
-def pr_group():
-    """Pull request commands"""
+@click.version_option(version='1.0.0')
+def cli():
+    """Cursor DevOps Toolkit - Empowering Cursor with DevOps capabilities."""
     pass
 
-@pr_group.command('create')
+
+# Linear commands
+@cli.group()
+def linear():
+    """Linear issue tracking operations."""
+    pass
+
+
+@linear.command("list")
+@click.option('--state', default='Ready for Dev', help='Filter by state')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
+def list_tasks(state: str, output_json: bool):
+    """List Linear tasks."""
+    # Get configuration
+    api_key = os.getenv('LINEAR_API_KEY')
+    team_id = os.getenv('LINEAR_TEAM_ID')
+    
+    if not api_key or not team_id:
+        logger.error("Missing LINEAR_API_KEY or LINEAR_TEAM_ID")
+        click.echo("Error: Please set LINEAR_API_KEY and LINEAR_TEAM_ID in .env file")
+        return
+    
+    # Initialize client
+    client = LinearClient(api_key=api_key, team_id=team_id)
+    
+    # Get tasks
+    tasks = client.get_ready_tasks(state=state)
+    
+    if output_json:
+        # JSON output for Cursor
+        task_data = [
+            {
+                'id': task.id,
+                'identifier': task.identifier,
+                'title': task.title,
+                'description': task.description,
+                'state': task.state,
+                'labels': task.labels
+            }
+            for task in tasks
+        ]
+        click.echo(json.dumps(task_data, indent=2))
+    else:
+        # Human-readable output
+        logger.info(f"Found {len(tasks)} tasks in '{state}' state:")
+        
+        if not tasks:
+            click.echo(f"No tasks found in '{state}' state")
+            return
+        
+        click.echo(f"\nFound {len(tasks)} tasks in '{state}' state:\n")
+        
+        for task in tasks:
+            click.echo(f"📋 {task.identifier}: {task.title}")
+            click.echo(f"   State: {task.state}")
+            click.echo(f"   Labels: {', '.join(task.labels) if task.labels else 'None'}")
+            if task.description:
+                # Show first line of description
+                first_line = task.description.split('\n')[0][:80]
+                if first_line:
+                    click.echo(f"   Description: {first_line}...")
+            click.echo()
+
+
+@linear.command("create")
+@click.option('--title', required=True, help='Task title')
+@click.option('--description', help='Task description')
+@click.option('--labels', multiple=True, help='Labels (can be used multiple times)')
+def create_task(title: str, description: str, labels: tuple):
+    """Create a new Linear task."""
+    # Get configuration
+    api_key = os.getenv('LINEAR_API_KEY')
+    team_id = os.getenv('LINEAR_TEAM_ID')
+    
+    if not api_key or not team_id:
+        logger.error("Missing LINEAR_API_KEY or LINEAR_TEAM_ID")
+        click.echo("Error: Please set LINEAR_API_KEY and LINEAR_TEAM_ID in .env file")
+        return
+    
+    # Initialize client
+    client = LinearClient(api_key=api_key, team_id=team_id)
+    
+    # Create task
+    task_id = client.create_task(
+        title=title,
+        description=description or "",
+        labels=list(labels)
+    )
+    
+    if task_id:
+        logger.success(f"Created task {task_id}")
+        click.echo(f"✅ Created task {task_id}")
+        click.echo(f"🔗 https://linear.app/team/issue/{task_id}")
+    else:
+        click.echo("❌ Failed to create task")
+
+
+@linear.command("update")
+@click.argument('task_id')
+@click.option('--state', help='New state (e.g., "In Progress", "Done")')
+@click.option('--comment', help='Add a comment')
+def update_task(task_id: str, state: Optional[str], comment: Optional[str]):
+    """Update a Linear task."""
+    # Get configuration
+    api_key = os.getenv('LINEAR_API_KEY')
+    team_id = os.getenv('LINEAR_TEAM_ID')
+    
+    if not api_key or not team_id:
+        logger.error("Missing LINEAR_API_KEY or LINEAR_TEAM_ID")
+        click.echo("Error: Please set LINEAR_API_KEY and LINEAR_TEAM_ID in .env file")
+        return
+    
+    # Initialize client
+    client = LinearClient(api_key=api_key, team_id=team_id)
+    
+    # Update task
+    success = client.update_task(task_id, state=state, comment=comment)
+    
+    if success:
+        logger.success(f"Updated task {task_id}")
+        click.echo(f"✅ Updated task {task_id}")
+    else:
+        click.echo(f"❌ Failed to update task {task_id}")
+
+
+# GitHub commands
+@cli.group()
+def github():
+    """GitHub repository operations."""
+    pass
+
+
+@github.command("branch")
+@click.argument('branch_name')
+@click.option('--base', default='main', help='Base branch (default: main)')
+def create_branch(branch_name: str, base: str):
+    """Create a new branch."""
+    # Get configuration
+    token = os.getenv('GITHUB_TOKEN')
+    repo = os.getenv('GITHUB_REPO')
+    
+    if not token or not repo:
+        logger.error("Missing GITHUB_TOKEN or GITHUB_REPO")
+        click.echo("Error: Please set GITHUB_TOKEN and GITHUB_REPO in .env file")
+        return
+    
+    # Initialize client
+    client = GitHubClient(token=token, repo=repo)
+    
+    # Create branch
+    success = client.create_branch(branch_name, base=base)
+    
+    if success:
+        logger.success(f"Created branch {branch_name}")
+        click.echo(f"✅ Created branch {branch_name} from {base}")
+    else:
+        click.echo(f"❌ Failed to create branch {branch_name}")
+
+
+@github.group()
+def pr():
+    """Pull request operations."""
+    pass
+
+
+@pr.command("create")
 @click.option('--title', required=True, help='PR title')
 @click.option('--body', required=True, help='PR description')
 @click.option('--branch', required=True, help='Source branch')
-@click.option('--base', default='staging', help='Target branch')
-@click.pass_context
-def create_pr(ctx, title, body, branch, base):
-    """Create a pull request"""
-    client = ctx.obj['github']
+@click.option('--base', default='main', help='Target branch (default: main)')
+def create_pr(title: str, body: str, branch: str, base: str):
+    """Create a pull request."""
+    # Get configuration
+    token = os.getenv('GITHUB_TOKEN')
+    repo = os.getenv('GITHUB_REPO')
     
-    try:
-        pr = client.create_pull_request(title, body, branch, base)
-        if pr:
-            logger.success(f"Created PR #{pr.number}")
-            logger.info(f"URL: {pr.html_url}")
-        else:
-            logger.error("Failed to create PR")
-    except Exception as e:
-        logger.error(f"Error: {e}")
-
-@pr_group.command('list')
-@click.option('--state', default='open', help='PR state (open/closed/all)')
-@click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
-@click.pass_context
-def list_prs(ctx, state, output_json):
-    """List pull requests"""
-    client = ctx.obj['github']
+    if not token or not repo:
+        logger.error("Missing GITHUB_TOKEN or GITHUB_REPO")
+        click.echo("Error: Please set GITHUB_TOKEN and GITHUB_REPO in .env file")
+        return
     
-    # This would need to be implemented in GitHubClient
-    logger.info(f"Listing {state} pull requests...")
-    # TODO: Implement PR listing
-
-# Multi-project support
-@cli.command('projects')
-@click.option('--set', 'project_name', help='Set active project')
-def projects(project_name):
-    """Manage multiple projects"""
-    if project_name:
-        # Update .env with new TARGET_PROJECT
-        logger.info(f"Switching to project: {project_name}")
-        # TODO: Implement project switching
+    # Initialize client
+    client = GitHubClient(token=token, repo=repo)
+    
+    # Create PR
+    pr_number = client.create_pull_request(title, body, branch, base)
+    
+    if pr_number:
+        logger.success(f"Created PR #{pr_number}")
+        click.echo(f"✅ Created PR #{pr_number}")
+        click.echo(f"🔗 https://github.com/{repo}/pull/{pr_number}")
     else:
-        # List available projects
-        logger.info("Available projects:")
-        # TODO: List projects from configuration
+        click.echo("❌ Failed to create PR")
+
+
+@pr.command("list")
+@click.option('--state', default='open', type=click.Choice(['open', 'closed', 'all']), help='PR state filter')
+@click.option('--limit', default=10, help='Maximum number of PRs to show')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
+def list_prs(state: str, limit: int, output_json: bool):
+    """List pull requests."""
+    # Get configuration
+    token = os.getenv('GITHUB_TOKEN')
+    repo = os.getenv('GITHUB_REPO')
+    
+    if not token or not repo:
+        logger.error("Missing GITHUB_TOKEN or GITHUB_REPO")
+        click.echo("Error: Please set GITHUB_TOKEN and GITHUB_REPO in .env file")
+        return
+    
+    # Initialize client
+    client = GitHubClient(token=token, repo=repo)
+    
+    # List PRs
+    prs = client.list_pull_requests(state=state, limit=limit)
+    
+    if output_json:
+        # JSON output for Cursor
+        click.echo(json.dumps(prs, indent=2))
+    else:
+        # Human-readable output
+        if not prs:
+            click.echo(f"No {state} pull requests found")
+            return
+        
+        click.echo(f"\nFound {len(prs)} {state} pull requests:\n")
+        
+        for pr in prs:
+            status_emoji = "🟢" if pr['state'] == 'open' else "🔴"
+            click.echo(f"{status_emoji} PR #{pr['number']}: {pr['title']}")
+            click.echo(f"   Author: {pr['author']}")
+            click.echo(f"   Created: {pr['created_at']}")
+            click.echo(f"   Branch: {pr['head']} → {pr['base']}")
+            click.echo(f"   URL: {pr['url']}")
+            click.echo()
+
+
+# Project management
+@cli.group()
+def project():
+    """Multi-project operations."""
+    pass
+
+
+@project.command("list")
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
+def list_projects(output_json: bool):
+    """List configured projects."""
+    projects = []
+    
+    # Look for project configurations in environment
+    env_vars = os.environ
+    
+    # Find all REPO configurations
+    repo_configs = {}
+    for key, value in env_vars.items():
+        if key.endswith('_GITHUB_REPO'):
+            project_name = key.replace('_GITHUB_REPO', '').lower()
+            repo_configs[project_name] = value
+    
+    # Check if we have a default/target project
+    target_project = os.getenv('TARGET_PROJECT', '').lower()
+    default_repo = os.getenv('GITHUB_REPO', '')
+    
+    # Build project list
+    for name, repo in repo_configs.items():
+        is_active = name == target_project or (not target_project and repo == default_repo)
+        projects.append({
+            'name': name,
+            'repo': repo,
+            'active': is_active
+        })
+    
+    # Add default if not already included
+    if default_repo and not any(p['repo'] == default_repo for p in projects):
+        projects.append({
+            'name': 'default',
+            'repo': default_repo,
+            'active': not target_project
+        })
+    
+    if output_json:
+        click.echo(json.dumps(projects, indent=2))
+    else:
+        if not projects:
+            click.echo("No projects configured")
+            click.echo("\nTo configure projects, add to your .env file:")
+            click.echo("  KEYSY3_GITHUB_REPO=owner/keysy3-repo")
+            click.echo("  IMMO_GITHUB_REPO=owner/immo-repo")
+            click.echo("  TARGET_PROJECT=keysy3  # Set active project")
+            return
+        
+        click.echo("\nConfigured projects:\n")
+        for proj in projects:
+            active = "✓" if proj['active'] else " "
+            click.echo(f" [{active}] {proj['name']}: {proj['repo']}")
+        
+        click.echo("\nTo switch projects, set TARGET_PROJECT in your .env file")
+
 
 if __name__ == '__main__':
     cli() 

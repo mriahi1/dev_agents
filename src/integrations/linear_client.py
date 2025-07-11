@@ -1,30 +1,32 @@
+"""Linear API client for task management."""
+
 from typing import List, Optional
-import httpx
-from tenacity import retry, stop_after_attempt, wait_fixed
-from ..utils.types import LinearTask
+import requests
 from loguru import logger
-import os
+
+from ..utils.types import LinearTask
+
 
 class LinearClient:
-    """Minimal Linear API client"""
+    """Client for interacting with Linear API."""
     
     def __init__(self, api_key: str, team_id: str):
+        """Initialize Linear client."""
         self.api_key = api_key
         self.team_id = team_id
         self.base_url = "https://api.linear.app/graphql"
-        
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
-    async def get_ready_tasks(self) -> List[LinearTask]:
-        """Get tasks in Ready for Dev state"""
-        
+        logger.debug(f"Initialized Linear client for team {team_id}")
+    
+    def get_ready_tasks(self, state: str = "Ready for Dev") -> List[LinearTask]:
+        """Get tasks in specified state."""
         query = """
-        query($teamId: ID!) {
+        query($teamId: ID!, $state: String!) {
             issues(
                 filter: {
                     team: { id: { eq: $teamId } }
-                    state: { name: { eq: "Ready for Dev" } }
+                    state: { name: { eq: $state } }
                 }
-                first: 20
+                first: 50
             ) {
                 nodes {
                     id
@@ -38,120 +40,64 @@ class LinearClient:
         }
         """
         
-        async with httpx.AsyncClient() as client:
-            try:
-                logger.debug(f"Making Linear API request to {self.base_url}")
-                logger.debug(f"Team ID: {self.team_id}")
-                
-                response = await client.post(
-                    self.base_url,
-                    json={"query": query, "variables": {"teamId": self.team_id}},
-                    headers={"Authorization": self.api_key}
-                )
-                
-                logger.debug(f"Response status: {response.status_code}")
-                
-                if response.status_code != 200:
-                    logger.error(f"Linear API error: Status {response.status_code}")
-                    logger.error(f"Response body: {response.text}")
-                    
-                response.raise_for_status()
-                
-            except httpx.HTTPStatusError as e:
-                logger.error(f"HTTP error occurred: {e}")
-                logger.error(f"Request URL: {e.request.url}")
-                logger.error(f"Response status: {e.response.status_code}")
-                logger.error(f"Response body: {e.response.text}")
-                raise
-            except Exception as e:
-                logger.error(f"Unexpected error: {type(e).__name__}: {e}")
-                raise
-            
-        data = response.json()
-        
-        # Check for GraphQL errors
-        if "errors" in data:
-            logger.error(f"GraphQL errors: {data['errors']}")
-            raise Exception(f"GraphQL query failed: {data['errors']}")
-            
-        # Check if data structure is as expected
-        if "data" not in data or "issues" not in data["data"]:
-            logger.error(f"Unexpected response structure: {data}")
-            raise Exception(f"Unexpected Linear API response structure")
-            
-        issues = data["data"]["issues"]["nodes"]
-        logger.info(f"Found {len(issues)} tasks from Linear")
-        
-        return [
-            LinearTask(
-                id=issue["id"],
-                identifier=issue["identifier"],
-                title=issue["title"],
-                description=issue["description"] or "",
-                state=issue["state"]["name"],
-                labels=[label["name"] for label in issue["labels"]["nodes"]]
+        try:
+            response = requests.post(
+                self.base_url,
+                json={
+                    "query": query,
+                    "variables": {"teamId": self.team_id, "state": state}
+                },
+                headers={"Authorization": self.api_key}
             )
-            for issue in issues
-        ]
-    
-    async def debug_get_all_tasks(self) -> List[dict]:
-        """Debug method to get all tasks for the team"""
-        query = """
-        query($teamId: ID!) {
-            issues(
-                filter: {
-                    team: { id: { eq: $teamId } }
-                }
-                first: 10
-            ) {
-                nodes {
-                    id
-                    identifier
-                    title
-                    description
-                    state { name }
-                    labels { nodes { name } }
-                    assignee { name }
-                }
-            }
-        }
-        """
-        
-        async with httpx.AsyncClient() as client:
-            try:
-                logger.debug(f"Debug: Fetching all tasks for team {self.team_id}")
-                
-                response = await client.post(
-                    self.base_url,
-                    json={"query": query, "variables": {"teamId": self.team_id}},
-                    headers={"Authorization": self.api_key}
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if "errors" in data:
+                logger.error(f"GraphQL errors: {data['errors']}")
+                return []
+            
+            issues = data.get("data", {}).get("issues", {}).get("nodes", [])
+            logger.info(f"Found {len(issues)} tasks from Linear")
+            
+            return [
+                LinearTask(
+                    id=issue["id"],
+                    identifier=issue["identifier"],
+                    title=issue["title"],
+                    description=issue.get("description", ""),
+                    state=issue["state"]["name"],
+                    labels=[label["name"] for label in issue.get("labels", {}).get("nodes", [])]
                 )
-                
-                response.raise_for_status()
-                
-            except Exception as e:
-                logger.error(f"Debug query error: {e}")
-                raise
+                for issue in issues
+            ]
             
-        data = response.json()
-        
-        if "errors" in data:
-            logger.error(f"GraphQL errors: {data['errors']}")
-            raise Exception(f"GraphQL query failed: {data['errors']}")
-            
-        issues = data["data"]["issues"]["nodes"]
-        logger.info(f"Debug: Found {len(issues)} total tasks")
-        
-        for issue in issues:
-            logger.info(f"  - {issue['identifier']}: {issue['title']}")
-            logger.info(f"    State: {issue['state']['name']}")
-            logger.info(f"    Labels: {[label['name'] for label in issue['labels']['nodes']]}")
-            logger.info(f"    Assignee: {issue['assignee']['name'] if issue['assignee'] else 'Unassigned'}")
-            
-        return issues
+        except Exception as e:
+            logger.error(f"Failed to get tasks: {e}")
+            return []
     
-    async def create_task(self, title: str, description: str, state_name: str = "Ready for Dev", labels: List[str] = None) -> dict:
-        """Create a new task in Linear"""
+    def create_task(
+        self,
+        title: str,
+        description: str = "",
+        labels: List[str] = None
+    ) -> Optional[str]:
+        """Create a new task in Linear.
+        
+        Returns:
+            Task identifier (e.g., "KEY-123") if successful, None otherwise
+        """
+        # First get the default state ID for "Ready for Dev"
+        state_id = self._get_state_id("Ready for Dev")
+        if not state_id:
+            logger.error("Could not find 'Ready for Dev' state")
+            return None
+        
+        # Get label IDs if provided
+        label_ids = []
+        if labels:
+            label_ids = self._get_label_ids(labels)
+        
         mutation = """
         mutation($teamId: String!, $title: String!, $description: String!, $stateId: String!, $labelIds: [String!]) {
             issueCreate(
@@ -174,8 +120,82 @@ class LinearClient:
         }
         """
         
-        # First, we need to get the state ID
-        state_query = """
+        variables = {
+            "teamId": self.team_id,
+            "title": title,
+            "description": description,
+            "stateId": state_id
+        }
+        
+        if label_ids:
+            variables["labelIds"] = label_ids
+        
+        try:
+            response = requests.post(
+                self.base_url,
+                json={"query": mutation, "variables": variables},
+                headers={"Authorization": self.api_key}
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if "errors" in data:
+                logger.error(f"Failed to create task: {data['errors']}")
+                return None
+            
+            if data.get("data", {}).get("issueCreate", {}).get("success"):
+                issue = data["data"]["issueCreate"]["issue"]
+                logger.info(f"Created task: {issue['identifier']} - {issue['title']}")
+                return issue["identifier"]
+            else:
+                logger.error("Failed to create task")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error creating task: {e}")
+            return None
+    
+    def update_task(
+        self,
+        task_id: str,
+        state: Optional[str] = None,
+        comment: Optional[str] = None
+    ) -> bool:
+        """Update a task's state and/or add a comment.
+        
+        Args:
+            task_id: Task identifier (e.g., "KEY-123")
+            state: New state name (e.g., "In Progress")
+            comment: Comment to add
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        success = True
+        
+        # Update state if provided
+        if state:
+            state_id = self._get_state_id(state)
+            if not state_id:
+                logger.error(f"Could not find state '{state}'")
+                return False
+            
+            success = self._update_task_state(task_id, state_id)
+            if success:
+                logger.info(f"Successfully updated task state to {state}")
+        
+        # Add comment if provided
+        if comment and success:
+            success = self._add_comment(task_id, comment)
+            if success:
+                logger.info("Successfully added comment")
+        
+        return success
+    
+    def _get_state_id(self, state_name: str) -> Optional[str]:
+        """Get state ID from state name."""
+        query = """
         query($teamId: ID!) {
             workflowStates(
                 filter: { team: { id: { eq: $teamId } } }
@@ -188,122 +208,69 @@ class LinearClient:
         }
         """
         
-        # Get label IDs if labels are provided
-        label_ids = []
-        if labels:
-            label_query = """
-            query($teamId: ID!) {
-                issueLabels(
-                    filter: { team: { id: { eq: $teamId } } }
-                ) {
-                    nodes {
-                        id
-                        name
-                    }
+        try:
+            response = requests.post(
+                self.base_url,
+                json={"query": query, "variables": {"teamId": self.team_id}},
+                headers={"Authorization": self.api_key}
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            states = data.get("data", {}).get("workflowStates", {}).get("nodes", [])
+            
+            for state in states:
+                if state["name"] == state_name:
+                    return state["id"]
+                    
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting state ID: {e}")
+            return None
+    
+    def _get_label_ids(self, label_names: List[str]) -> List[str]:
+        """Get label IDs from label names."""
+        query = """
+        query($teamId: ID!) {
+            issueLabels(
+                filter: { team: { id: { eq: $teamId } } }
+            ) {
+                nodes {
+                    id
+                    name
                 }
             }
-            """
+        }
+        """
+        
+        try:
+            response = requests.post(
+                self.base_url,
+                json={"query": query, "variables": {"teamId": self.team_id}},
+                headers={"Authorization": self.api_key}
+            )
+            response.raise_for_status()
             
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.base_url,
-                    json={"query": label_query, "variables": {"teamId": self.team_id}},
-                    headers={"Authorization": self.api_key}
-                )
-                response.raise_for_status()
-                
-            label_data = response.json()
-            all_labels = label_data["data"]["issueLabels"]["nodes"]
+            data = response.json()
+            all_labels = data.get("data", {}).get("issueLabels", {}).get("nodes", [])
             
-            for label_name in labels:
+            label_ids = []
+            for label_name in label_names:
                 for label in all_labels:
                     if label["name"] == label_name:
                         label_ids.append(label["id"])
                         break
-        
-        async with httpx.AsyncClient() as client:
-            # Get state ID
-            response = await client.post(
-                self.base_url,
-                json={"query": state_query, "variables": {"teamId": self.team_id}},
-                headers={"Authorization": self.api_key}
-            )
-            response.raise_for_status()
+                        
+            return label_ids
             
-            state_data = response.json()
-            states = state_data["data"]["workflowStates"]["nodes"]
-            
-            state_id = None
-            for state in states:
-                if state["name"] == state_name:
-                    state_id = state["id"]
-                    break
-                    
-            if not state_id:
-                raise Exception(f"State '{state_name}' not found")
-            
-            # Create the issue
-            logger.debug(f"Creating issue with variables: teamId={self.team_id}, title={title}, stateId={state_id}")
-            
-            # Build variables dict - only include labelIds if we have labels
-            variables = {
-                "teamId": self.team_id,
-                "title": title,
-                "description": description,
-                "stateId": state_id
-            }
-            
-            if label_ids:
-                variables["labelIds"] = label_ids
-                
-            response = await client.post(
-                self.base_url,
-                json={
-                    "query": mutation,
-                    "variables": variables
-                },
-                headers={"Authorization": self.api_key}
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Create task failed with status {response.status_code}")
-                logger.error(f"Response: {response.text}")
-                
-            response.raise_for_status()
-            
-        data = response.json()
-        
-        if "errors" in data:
-            raise Exception(f"Failed to create task: {data['errors']}")
-            
-        if data["data"]["issueCreate"]["success"]:
-            issue = data["data"]["issueCreate"]["issue"]
-            logger.info(f"Created task: {issue['identifier']} - {issue['title']}")
-            logger.info(f"Task URL: {issue['url']}")
-            return issue
-        else:
-            raise Exception("Failed to create task")
+        except Exception as e:
+            logger.error(f"Error getting label IDs: {e}")
+            return []
     
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
-    async def update_task(self, task_id: str, state_name: str, comment: str) -> bool:
-        """Update task state and add comment"""
-        
-        # First, get the state ID from state name
-        state_query = """
-        query($teamId: ID!) {
-            workflowStates(
-                filter: { team: { id: { eq: $teamId } } }
-            ) {
-                nodes {
-                    id
-                    name
-                }
-            }
-        }
-        """
-        
-        # Update state mutation
-        state_mutation = """
+    def _update_task_state(self, task_id: str, state_id: str) -> bool:
+        """Update task state."""
+        mutation = """
         mutation($issueId: String!, $stateId: String!) {
             issueUpdate(
                 id: $issueId,
@@ -314,8 +281,32 @@ class LinearClient:
         }
         """
         
-        # Then add comment
-        comment_mutation = """
+        try:
+            response = requests.post(
+                self.base_url,
+                json={
+                    "query": mutation,
+                    "variables": {"issueId": task_id, "stateId": state_id}
+                },
+                headers={"Authorization": self.api_key}
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if "errors" in data:
+                logger.error(f"Failed to update state: {data['errors']}")
+                return False
+                
+            return data.get("data", {}).get("issueUpdate", {}).get("success", False)
+            
+        except Exception as e:
+            logger.error(f"Error updating task state: {e}")
+            return False
+    
+    def _add_comment(self, task_id: str, comment: str) -> bool:
+        """Add comment to task."""
+        mutation = """
         mutation($issueId: String!, $body: String!) {
             commentCreate(
                 input: {
@@ -328,78 +319,28 @@ class LinearClient:
         }
         """
         
-        async with httpx.AsyncClient() as client:
-            try:
-                # Get state ID
-                response = await client.post(
-                    self.base_url,
-                    json={"query": state_query, "variables": {"teamId": self.team_id}},
-                    headers={"Authorization": self.api_key}
-                )
-                response.raise_for_status()
-                
-                state_data = response.json()
-                states = state_data["data"]["workflowStates"]["nodes"]
-                
-                state_id = None
-                for state in states:
-                    if state["name"] == state_name:
-                        state_id = state["id"]
-                        break
-                        
-                if not state_id:
-                    raise Exception(f"State '{state_name}' not found")
-                
-                # Update state
-                logger.debug(f"Updating task {task_id} to state: {state_name} (ID: {state_id})")
-                response = await client.post(
-                    self.base_url,
-                    json={"query": state_mutation, "variables": {
-                        "issueId": task_id,
-                        "stateId": state_id
-                    }},
-                    headers={"Authorization": self.api_key}
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"Failed to update task state: {response.status_code}")
-                    logger.error(f"Response: {response.text}")
-                    raise Exception(f"Failed to update task state: HTTP {response.status_code}")
-                
-                data = response.json()
-                if "errors" in data:
-                    logger.error(f"GraphQL errors updating state: {data['errors']}")
-                    raise Exception(f"Failed to update task state: {data['errors']}")
-                    
-                if not data.get("data", {}).get("issueUpdate", {}).get("success", False):
-                    logger.error(f"State update failed: {data}")
-                    raise Exception("Failed to update task state")
-                    
-                logger.info(f"Successfully updated task state to {state_name}")
-                
-                # Add comment
-                logger.debug(f"Adding comment to task {task_id}")
-                response = await client.post(
-                    self.base_url,
-                    json={"query": comment_mutation, "variables": {
+        try:
+            response = requests.post(
+                self.base_url,
+                json={
+                    "query": mutation,
+                    "variables": {
                         "issueId": task_id,
                         "body": f"🤖 {comment}"
-                    }},
-                    headers={"Authorization": self.api_key}
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"Failed to add comment: {response.status_code}")
-                    logger.error(f"Response: {response.text}")
-                    # Don't fail if comment fails, just log it
-                    
-                data = response.json()
-                if "errors" in data:
-                    logger.error(f"GraphQL errors adding comment: {data['errors']}")
-                    # Don't fail if comment fails, just log it
-                    
-            except Exception as e:
-                logger.error(f"Error updating task: {e}")
-                raise
+                    }
+                },
+                headers={"Authorization": self.api_key}
+            )
+            response.raise_for_status()
             
-        return True 
+            data = response.json()
+            
+            if "errors" in data:
+                logger.error(f"Failed to add comment: {data['errors']}")
+                return False
+                
+            return data.get("data", {}).get("commentCreate", {}).get("success", False)
+            
+        except Exception as e:
+            logger.error(f"Error adding comment: {e}")
+            return False 
