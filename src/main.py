@@ -8,10 +8,13 @@ import click
 import json
 from loguru import logger
 from typing import Optional
+from dotenv import load_dotenv
 
 from .integrations.linear_client import LinearClient
 from .integrations.github_client import GitHubClient
 
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logger.add("cursor-toolkit.log", rotation="10 MB")
