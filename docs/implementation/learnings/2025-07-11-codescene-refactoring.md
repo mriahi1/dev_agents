@@ -18,10 +18,17 @@ The `app/properties/[id]/page.tsx` file grew to **1983 lines** after adding the 
 
 ## Solution
 
-Extracted the leases tab into a separate component:
+### Phase 1: Extract Leases Tab
 - Created `components/properties/property-leases-tab.tsx` (361 lines)
 - Reduced main file from 1983 to 1667 lines
-- Improved separation of concerns
+
+### Phase 2: Further Decomposition
+- Extract `PropertyLeasesStats` (116 lines)
+- Extract `PropertyLeasesTable` (131 lines)
+- Extract `PropertyDetailHeader` (80 lines)
+- Extract `PropertyDetailTabs` (60 lines)
+- Reduced `PropertyLeasesTab` from 358 to 189 lines
+- Created 6 focused components instead of 2 large ones
 
 ## Key Learnings
 
