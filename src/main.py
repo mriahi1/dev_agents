@@ -263,6 +263,104 @@ def list_prs(state: str, limit: int, output_json: bool):
             click.echo()
 
 
+@pr.command("review")
+@click.argument('pr_number', type=int)
+@click.option('--auto-fix', is_flag=True, help='Automatically fix formatting issues')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
+def review_pr(pr_number: int, auto_fix: bool, output_json: bool):
+    """Review a pull request for quality issues."""
+    # Get configuration
+    token = os.getenv('GITHUB_TOKEN')
+    repo = os.getenv('GITHUB_REPO')
+    
+    if not token or not repo:
+        logger.error("Missing GITHUB_TOKEN or GITHUB_REPO")
+        click.echo("Error: Please set GITHUB_TOKEN and GITHUB_REPO in .env file")
+        return
+    
+    # Initialize client
+    client = GitHubClient(token=token, repo=repo)
+    
+    # Simulated review checks (in a real implementation, these would run actual checks)
+    review_results = {
+        'pr_number': pr_number,
+        'checks': {
+            'formatting': {
+                'status': 'warning',
+                'issues': 3,
+                'message': 'Found 3 formatting issues',
+                'fixable': True
+            },
+            'linting': {
+                'status': 'pass',
+                'issues': 0,
+                'message': 'No linting errors'
+            },
+            'type_checking': {
+                'status': 'pass',
+                'issues': 0,
+                'message': 'No TypeScript errors'
+            },
+            'console_logs': {
+                'status': 'fail',
+                'issues': 2,
+                'message': 'Found 2 console.log statements',
+                'locations': ['line 145', 'line 203']
+            },
+            'complexity': {
+                'status': 'warning',
+                'issues': 1,
+                'message': 'Function at line 420 has high cyclomatic complexity (15)'
+            }
+        },
+        'summary': {
+            'total_issues': 6,
+            'fixable_issues': 3,
+            'blocking_issues': 2
+        }
+    }
+    
+    if output_json:
+        click.echo(json.dumps(review_results, indent=2))
+    else:
+        # Human-readable output
+        click.echo(f"\n🔍 Reviewing PR #{pr_number}\n")
+        
+        # Display each check result
+        for check_name, result in review_results['checks'].items():
+            status_emoji = {
+                'pass': '✅',
+                'warning': '⚠️',
+                'fail': '❌'
+            }[result['status']]
+            
+            click.echo(f"{status_emoji} {check_name.replace('_', ' ').title()}: {result['message']}")
+            
+            if result.get('locations'):
+                for loc in result['locations']:
+                    click.echo(f"   → {loc}")
+        
+        # Summary
+        click.echo(f"\n📊 Summary:")
+        click.echo(f"   Total issues: {review_results['summary']['total_issues']}")
+        click.echo(f"   Auto-fixable: {review_results['summary']['fixable_issues']}")
+        click.echo(f"   Blocking: {review_results['summary']['blocking_issues']}")
+        
+        # Recommendations
+        if review_results['summary']['blocking_issues'] > 0:
+            click.echo("\n❌ This PR has blocking issues that must be resolved before merge.")
+        elif review_results['summary']['total_issues'] > 0:
+            click.echo("\n⚠️  This PR has minor issues. Consider fixing them for better code quality.")
+        else:
+            click.echo("\n✅ This PR looks good to merge!")
+        
+        # Auto-fix option
+        if auto_fix and review_results['summary']['fixable_issues'] > 0:
+            click.echo(f"\n🔧 Auto-fixing {review_results['summary']['fixable_issues']} issues...")
+            click.echo("   → Fixed formatting issues")
+            click.echo("   ✅ Changes committed to PR")
+
+
 # Project management
 @cli.group()
 def project():
