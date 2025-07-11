@@ -119,6 +119,23 @@ fi
 - Dependency optimization
 ```
 
+### 8. API Terminology Standardization
+**Source**: [2025-07-11-api-terminology](./2025-07-11-api-terminology.md)
+**Status**: 📋 Planned
+**Description**: Document and standardize frontend/backend terminology differences
+
+**Action Items**:
+- [ ] Create API terminology mapping document
+- [ ] Build translation constants file (e.g., API_TERMS.ts)
+- [ ] Update all API service files with clear comments
+- [ ] Consider refactoring to use consistent terms
+- [ ] Add to onboarding documentation
+
+**Known Mappings**:
+- Frontend: `property` → Backend: `operation`
+- Frontend: `propertyId` → API param: `operation`
+- Lease object: `lease.operation` (not `lease.property`)
+
 ## Completed Improvements
 
 ### Learning Protocol System
