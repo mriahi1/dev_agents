@@ -1,94 +1,60 @@
-# MVP: Autonomous PR System
+# Cursor DevOps Toolkit - Source Code
 
-A minimal viable implementation that automatically creates PRs from Linear tasks.
+This directory contains the implementation of the Cursor DevOps Toolkit.
 
-## What It Does
+## Structure
 
-1. Reads Linear tasks with `auto-pr-safe` label in "Ready" state
-2. Handles simple, safe changes:
-   - Fix typos
-   - Update text/labels/messages
-   - Add loading states
-3. Creates PR to staging branch
-4. Updates Linear task status automatically
-
-## Quick Start
-
-1. **Setup Environment**
-   ```bash
-   make setup
-   ```
-
-2. **Configure API Keys**
-   Edit `.env` file:
-   ```
-   LINEAR_API_KEY=lin_api_your_key_here
-   GITHUB_TOKEN=ghp_your_token_here
-   LINEAR_TEAM_ID=your-team-id
-   
-   # Choose which project to work on (keysy3 or immo)
-   TARGET_PROJECT=keysy3
-   
-   # Map each project to its GitHub repo
-   KEYSY3_GITHUB_REPO=owner/keysy3-repo
-   IMMO_GITHUB_REPO=owner/immo-repo
-   ```
-   
-   See [Multi-Project Setup Guide](../docs/implementation/multi-project-setup.md) for details.
-
-3. **Verify Setup**
-   ```bash
-   python scripts/verify_setup.py
-   ```
-
-4. **Create Test Task in Linear**
-   - Title: "Fix typo in README"
-   - Label: `auto-pr-safe`
-   - State: "Ready"
-
-5. **Run in Dry Mode**
-   ```bash
-   make run-dry
-   ```
-
-6. **Run for Real**
-   ```bash
-   make run
-   ```
+```
+src/
+├── main.py              # CLI entry point using Click
+├── integrations/        # External service integrations
+│   ├── linear_client.py # Linear API client
+│   └── github_client.py # GitHub API client
+└── utils/              # Shared utilities
+    └── types.py        # Type definitions
+```
 
 ## Architecture
 
+The toolkit follows a simple, modular design:
+
+1. **CLI Interface** (`main.py`)
+   - Click-based command structure
+   - Groups: `linear`, `github`  
+   - JSON output for Cursor parsing
+
+2. **Integration Clients**
+   - Each client handles one external service
+   - Simple methods that map to API operations
+   - Proper error handling and logging
+
+3. **Type Safety**
+   - Pydantic models for data validation
+   - Type hints throughout
+   - Mypy for static checking
+
+## Design Principles
+
+- **Simple** - Each component does one thing well
+- **Transparent** - No hidden behavior or "magic"
+- **Cursor-Friendly** - Structured output that's easy to parse
+- **Extensible** - Easy to add new integrations
+
+## Usage
+
+The toolkit is invoked through the main module:
+
+```bash
+python -m src.main [command] [options]
 ```
-Linear Task → Pattern Matching → GitHub PR → Update Linear
-```
 
-- **No AI** - Just pattern matching
-- **No Complex State** - Simple dictionaries
-- **No LangGraph** - Sequential flow only
-- **Safe by Design** - Only handles simple changes
+See the main [README](../README.md) for usage examples.
 
-## Files
+## Adding New Integrations
 
-- `main.py` - Main orchestrator
-- `agents/creator.py` - Pattern matching for changes
-- `integrations/linear_client.py` - Linear API wrapper
-- `integrations/github_client.py` - GitHub API wrapper
-- `utils/types.py` - Type definitions
+1. Create a new client in `integrations/`
+2. Add command group to `main.py`
+3. Update environment variables
+4. Add tests (when we add testing)
 
-## Safety Features
-
-- Only processes tasks with `auto-pr-safe` label
-- Rejects complex tasks (long descriptions)
-- Creates PRs to staging only
-- Dry-run mode by default
-- Error handling with Linear updates
-
-## Next Steps
-
-After MVP success, add:
-- LangGraph orchestration
-- GPT-4 understanding
-- Multi-file changes
-- Cognitive loops
-
-But first: **Ship this and prove it works!** 
+Remember: The toolkit provides operations, Cursor provides intelligence. 

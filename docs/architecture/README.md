@@ -1,66 +1,29 @@
-# 🏗️ System Architecture
+# Architecture Documentation
 
-## Overview
+⚠️ **Note**: Most documents in this directory are from the original "Autonomous PR System" vision. They are kept for historical reference but do not reflect the current Cursor DevOps Toolkit architecture.
 
-The Autonomous PR System is a **cognitive agent system** that mimics the structure and decision-making of a real product organization. Built on LangGraph, it creates a self-improving engineering capability that understands not just HOW to build, but WHY and WHAT to build.
+For the current architecture, see:
+- [Toolkit Transformation](../implementation/toolkit-transformation.md) - How we evolved to the current approach
+- [Source Code README](../../src/README.md) - Current implementation structure
 
-## Core Principles
+## Historical Documents
 
-### 1. Cognitive Organization Model
-We model three essential loops that mirror human product development:
+The following documents describe the original autonomous system design:
+- `original-system-plan.md` - The original autonomous vision
+- `langgraph-architecture.md` - LangGraph-based autonomous design
+- `cognitive-loops.md` - Three-loop cognitive model
+- `state-management.md` - Complex state management for autonomous operation
+- `safety-design.md` - Safety mechanisms for autonomous code generation
 
-- **Demand Loop** - Identifies what matters (Product Management)
-- **Production Loop** - Builds solutions (Engineering)  
-- **Learning Loop** - Improves over time (Analytics)
+## Current Architecture
 
-### 2. Safety-First Design
-Every action passes through multiple safety gates:
-- Pattern matching for dangerous operations
-- Complexity limits
-- Human-in-the-loop approval
-- Automated rollback capabilities
+The Cursor DevOps Toolkit follows a much simpler architecture:
 
-### 3. Observable & Traceable
-Using LangGraph's state management:
-- Every decision is logged
-- State transitions are checkpointed
-- Full audit trail for compliance
+```
+User → Cursor → CLI Commands → External APIs → Results → Cursor → User
+```
 
-## Architecture Components
-
-| Component | Purpose | Documentation |
-|-----------|---------|---------------|
-| Cognitive Loops | Core agent orchestration | [cognitive-loops.md](cognitive-loops.md) |
-| State Management | LangGraph state design | [state-management.md](state-management.md) |
-| Safety System | Multi-layer protection | [safety-design.md](safety-design.md) |
-| Agent Framework | Base agent patterns | [agent-framework.md](agent-framework.md) |
-
-## Technology Stack
-
-- **Orchestration**: LangGraph 0.2.0
-- **AI/ML**: LangChain, OpenAI GPT-4
-- **State Storage**: PostgreSQL (checkpointing)
-- **Caching**: Redis
-- **Monitoring**: LangSmith
-- **Integrations**: Linear, GitHub, Vercel, Sentry
-
-## Design Decisions
-
-### Why LangGraph?
-1. **Stateful workflows** - Perfect for multi-agent systems
-2. **Built-in checkpointing** - Crash recovery and debugging
-3. **Human-in-the-loop** - Native approval gates
-4. **Cyclic graphs** - Natural fit for feedback loops
-
-### Why Cognitive Loops?
-1. **Mirrors real organizations** - Familiar mental model
-2. **Separation of concerns** - Each loop has clear purpose
-3. **Natural feedback** - Learning improves all loops
-4. **Scalable** - Add agents without changing structure
-
-## Next Steps
-
-1. Understand the [Cognitive Loops](cognitive-loops.md)
-2. Review [State Management](state-management.md) design
-3. Study [Safety Design](safety-design.md) principles
-4. Explore the [Agent Framework](agent-framework.md) 
+- **No autonomous operation** - Human + Cursor collaboration
+- **Simple CLI tools** - Each tool does one thing
+- **No complex state** - Stateless operations
+- **Direct API integration** - Linear and GitHub clients 
