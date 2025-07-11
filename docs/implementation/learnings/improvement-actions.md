@@ -99,6 +99,26 @@ fi
 - Nested complexity
 - Low cohesion warnings
 
+### 7. React Hook Best Practices
+**Source**: [2025-07-11-infinite-loop-fix](./2025-07-11-infinite-loop-fix.md)
+**Status**: 📋 Planned
+**Description**: Establish patterns to prevent infinite loops and performance issues
+
+**Action Items**:
+- [ ] Document hook dependency best practices
+- [ ] Create custom hook guidelines
+- [ ] Add ESLint rules for exhaustive-deps
+- [ ] Review existing hooks for similar issues
+- [ ] Create useMemo/useCallback usage guide
+
+**Pattern Library**:
+```typescript
+// Document common patterns
+- Static initial values
+- Proper update methods
+- Dependency optimization
+```
+
 ## Completed Improvements
 
 ### Learning Protocol System
