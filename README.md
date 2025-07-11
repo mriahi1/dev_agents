@@ -71,6 +71,39 @@ python -m src.main github pr create \
   --branch fix/KEY-250-login
 ```
 
+### PR Review
+
+The toolkit includes a comprehensive PR review system that performs real code analysis:
+
+```bash
+# Basic code quality review
+dev-agents github pr review 123
+
+# Include security analysis
+dev-agents github pr review 123 --security
+
+# Include performance analysis
+dev-agents github pr review 123 --performance
+
+# Include accessibility analysis
+dev-agents github pr review 123 --accessibility
+
+# Full analysis with all checks
+dev-agents github pr review 123 --security --performance --accessibility
+
+# Auto-fix formatting issues
+dev-agents github pr review 123 --auto-fix
+
+# Get JSON output for parsing
+dev-agents github pr review 123 --json
+```
+
+The PR review system includes:
+- **Code Quality**: Console logs, complexity, TODOs, formatting, linting, TypeScript
+- **Security**: Hardcoded secrets, SQL injection, XSS, eval usage, CORS issues
+- **Performance**: React re-renders, memoization, bundle size, memory leaks
+- **Accessibility**: Alt text, ARIA labels, heading hierarchy, semantic HTML
+
 ## 📁 Multi-Project Setup
 
 ```

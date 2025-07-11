@@ -7,20 +7,32 @@ from loguru import logger
 
 
 class GitHubClient:
-    """Client for interacting with GitHub API."""
+    """GitHub integration client."""
     
     def __init__(self, token: str, repo: str):
-        """Initialize GitHub client."""
-        self.github = Github(token)
+        """Initialize GitHub client.
+        
+        Args:
+            token: GitHub personal access token
+            repo: Repository in format 'owner/repo'
+        """
+        self.token = token
         self.repo_name = repo
-        self.repo = self.github.get_repo(repo)
+        self.github = Github(token)
+        self.repo = None
         logger.debug(f"Initialized GitHub client for {repo}")
     
-    def create_branch(self, branch_name: str, base: str = "main") -> bool:
+    def _init_repo(self):
+        """Initialize repository object if not already done."""
+        if self.repo is None:
+            self.repo = self.github.get_repo(self.repo_name)
+    
+    def create_branch(self, branch_name: str, base_branch: str = "main") -> bool:
         """Create a new branch from base."""
+        self._init_repo()
         try:
             # Get the SHA of the base branch
-            base_ref = self.repo.get_git_ref(f"heads/{base}")
+            base_ref = self.repo.get_git_ref(f"heads/{base_branch}")
             base_sha = base_ref.object.sha
             
             # Create new branch
@@ -28,7 +40,7 @@ class GitHubClient:
                 ref=f"refs/heads/{branch_name}",
                 sha=base_sha
             )
-            logger.info(f"Created branch {branch_name} from {base}")
+            logger.info(f"Created branch {branch_name} from {base_branch}")
             return True
         except Exception as e:
             if "Reference already exists" in str(e):
@@ -45,6 +57,7 @@ class GitHubClient:
         base: str = "main"
     ) -> Optional[int]:
         """Create a pull request."""
+        self._init_repo()
         try:
             pr = self.repo.create_pull(
                 title=title,
@@ -59,50 +72,46 @@ class GitHubClient:
             logger.error(f"Failed to create PR: {e}")
             return None
     
-    def list_pull_requests(
-        self,
-        state: str = "all",
-        limit: int = 20
-    ) -> List[Dict[str, Any]]:
-        """List pull requests.
+    def list_pull_requests(self, state: str = "open"):
+        """List pull requests with specified state."""
+        self._init_repo()
         
-        Args:
-            state: 'open', 'closed', or 'all'
-            limit: Maximum number of PRs to return
-            
-        Returns:
-            List of PR information dictionaries
-        """
+        if state == "all":
+            # Get both open and closed PRs
+            open_prs = list(self.repo.get_pulls(state='open'))
+            closed_prs = list(self.repo.get_pulls(state='closed'))
+            pulls = open_prs + closed_prs
+        else:
+            pulls = self.repo.get_pulls(state=state)
+        
+        pr_list = []
+        for pr in pulls:
+            pr_list.append({
+                'number': pr.number,
+                'title': pr.title,
+                'state': pr.state,
+                'author': pr.user.login,
+                'created_at': pr.created_at.isoformat() if pr.created_at else None,
+                'updated_at': pr.updated_at.isoformat() if pr.updated_at else None,
+                'draft': pr.draft,
+                'url': pr.html_url
+            })
+        
+        return pr_list
+    
+    def get_pr_files(self, pr_number: int) -> List[str]:
+        """Get list of changed files in a pull request."""
+        self._init_repo()
+        
         try:
-            pulls = self.repo.get_pulls(
-                state=state,
-                sort="created",
-                direction="desc"
-            )
+            pr = self.repo.get_pull(pr_number)
+            files = pr.get_files()
             
-            pr_list = []
-            for i, pr in enumerate(pulls):
-                if i >= limit:
-                    break
-                    
-                pr_info = {
-                    "number": pr.number,
-                    "title": pr.title,
-                    "state": pr.state,
-                    "author": pr.user.login,
-                    "created_at": pr.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                    "url": pr.html_url,
-                    "base": pr.base.ref,
-                    "head": pr.head.ref
-                }
-                pr_list.append(pr_info)
-            
-            logger.info(f"Found {len(pr_list)} pull requests")
-            return pr_list
-            
-        except Exception as e:
-            logger.error(f"Failed to list PRs: {e}")
-            return []
+            # Return list of file paths
+            return [f.filename for f in files]
+        except github.GithubException as e:
+            logger.error(f"Failed to get PR files: {e}")
+            raise Exception(f"Failed to get PR #{pr_number} files: {e}")
     
     def create_or_update_file(
         self,
@@ -112,6 +121,7 @@ class GitHubClient:
         branch: str
     ) -> bool:
         """Create or update a file in the repository."""
+        self._init_repo()
         try:
             # Try to get existing file
             try:

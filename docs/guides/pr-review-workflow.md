@@ -79,6 +79,54 @@ Before approving any PR, verify:
 - [ ] **Tests**: Are there tests for new functionality?
 - [ ] **Documentation**: Are complex parts documented?
 
+## Available Checks
+
+### Code Quality Checks (Default)
+- **Console Logs**: Detects console.log, console.error, etc. statements
+- **Code Complexity**: Identifies functions with high cyclomatic complexity (>10)
+- **TODO Comments**: Finds TODO, FIXME, HACK, XXX, BUG comments
+- **Long Lines**: Flags lines exceeding 120 characters
+- **Large Functions**: Identifies functions over 50 lines
+- **Formatting**: Checks code formatting using Prettier
+- **Linting**: Runs ESLint to find code quality issues
+- **Type Checking**: Runs TypeScript compiler to check for type errors
+
+### Security Checks (`--security`)
+- **Hardcoded Secrets**: Detects hardcoded passwords, secrets, API keys
+- **SQL Injection**: Identifies potential SQL injection vulnerabilities
+- **XSS Vulnerabilities**: Finds potential cross-site scripting issues
+- **Unsafe Regex**: Detects regular expressions vulnerable to ReDoS attacks
+- **Exposed API Keys**: Identifies common API key patterns
+- **Insecure Random**: Flags use of Math.random() for security purposes
+- **Eval Usage**: Detects dangerous eval() and similar functions
+- **CORS Issues**: Identifies insecure CORS configurations
+
+### Performance Checks (`--performance`)
+- **Unnecessary Re-renders**: React patterns causing extra renders
+- **Missing Memoization**: Expensive operations without useMemo/useCallback
+- **Large Bundle Imports**: Imports that increase bundle size
+- **Inefficient Loops**: Nested array methods and mutations in loops
+- **Missing Keys**: React list items without keys
+- **Sync Operations**: Blocking synchronous operations
+- **Memory Leaks**: Event listeners and timers without cleanup
+- **Unoptimized Images**: Images without lazy loading or optimization
+
+### Accessibility Checks (`--accessibility`)
+- **Missing Alt Text**: Images without alt attributes
+- **Missing ARIA Labels**: Interactive elements without labels
+- **Missing Form Labels**: Form inputs without associated labels
+- **Color Contrast**: Potential low contrast text
+- **Interactive Elements**: Non-semantic clickable elements
+- **Heading Hierarchy**: Improper heading level structure
+- **Focus Management**: Missing focus indicators
+- **Semantic HTML**: Non-semantic HTML usage
+
+## Check Severity Levels
+
+- **❌ Fail**: Blocking issues that must be fixed (console.logs, TypeScript errors, security vulnerabilities)
+- **⚠️ Warning**: Non-blocking issues that should be addressed (complexity, TODOs, accessibility)
+- **✅ Pass**: Check passed with no issues
+
 ## Setting Up Automated Checks
 
 ### GitHub Actions Integration

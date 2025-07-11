@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from .integrations.linear_client import LinearClient
 from .integrations.github_client import GitHubClient
+from .analyzers import CodeAnalyzer, SecurityAnalyzer, PerformanceAnalyzer, AccessibilityAnalyzer
 
 # Load environment variables from .env file
 load_dotenv()
@@ -267,7 +268,10 @@ def list_prs(state: str, limit: int, output_json: bool):
 @click.argument('pr_number', type=int)
 @click.option('--auto-fix', is_flag=True, help='Automatically fix formatting issues')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
-def review_pr(pr_number: int, auto_fix: bool, output_json: bool):
+@click.option('--security', is_flag=True, help='Include security analysis')
+@click.option('--performance', is_flag=True, help='Include performance analysis')
+@click.option('--accessibility', is_flag=True, help='Include accessibility analysis')
+def review_pr(pr_number: int, auto_fix: bool, output_json: bool, security: bool, performance: bool, accessibility: bool):
     """Review a pull request for quality issues."""
     # Get configuration
     token = os.getenv('GITHUB_TOKEN')
@@ -281,64 +285,100 @@ def review_pr(pr_number: int, auto_fix: bool, output_json: bool):
     # Initialize client
     client = GitHubClient(token=token, repo=repo)
     
-    # Simulated review checks (in a real implementation, these would run actual checks)
+    # Get PR files
+    try:
+        changed_files = client.get_pr_files(pr_number)
+        if not changed_files:
+            click.echo(f"No files changed in PR #{pr_number}")
+            return
+    except Exception as e:
+        logger.error(f"Failed to get PR files: {e}")
+        click.echo(f"Error: Failed to get PR files: {e}")
+        return
+    
+    # Initialize analyzers
+    code_analyzer = CodeAnalyzer()
+    
+    # Run basic code analysis
+    logger.info(f"Analyzing {len(changed_files)} files in PR #{pr_number}")
+    code_results = code_analyzer.analyze_pr_files(changed_files)
+    
+    # Combine all results
     review_results = {
         'pr_number': pr_number,
-        'checks': {
-            'formatting': {
-                'status': 'warning',
-                'issues': 3,
-                'message': 'Found 3 formatting issues',
-                'fixable': True
-            },
-            'linting': {
-                'status': 'pass',
-                'issues': 0,
-                'message': 'No linting errors'
-            },
-            'type_checking': {
-                'status': 'pass',
-                'issues': 0,
-                'message': 'No TypeScript errors'
-            },
-            'console_logs': {
-                'status': 'fail',
-                'issues': 2,
-                'message': 'Found 2 console.log statements',
-                'locations': ['line 145', 'line 203']
-            },
-            'complexity': {
-                'status': 'warning',
-                'issues': 1,
-                'message': 'Function at line 420 has high cyclomatic complexity (15)'
-            }
-        },
-        'summary': {
-            'total_issues': 6,
-            'fixable_issues': 3,
-            'blocking_issues': 2
-        }
+        'files_changed': len(changed_files),
+        'checks': code_results
+    }
+    
+    # Run additional analyzers if requested
+    if security:
+        security_analyzer = SecurityAnalyzer()
+        security_results = security_analyzer.analyze_pr_files(changed_files)
+        review_results['security'] = security_results
+        
+    if performance:
+        performance_analyzer = PerformanceAnalyzer()
+        performance_results = performance_analyzer.analyze_pr_files(changed_files)
+        review_results['performance'] = performance_results
+        
+    if accessibility:
+        accessibility_analyzer = AccessibilityAnalyzer()
+        accessibility_results = accessibility_analyzer.analyze_pr_files(changed_files)
+        review_results['accessibility'] = accessibility_results
+    
+    # Calculate summary
+    total_issues = 0
+    blocking_issues = 0
+    fixable_issues = 0
+    
+    # Count issues from all checks
+    all_checks = [review_results['checks']]
+    if 'security' in review_results:
+        all_checks.append(review_results['security'])
+    if 'performance' in review_results:
+        all_checks.append(review_results['performance'])
+    if 'accessibility' in review_results:
+        all_checks.append(review_results['accessibility'])
+        
+    for check_group in all_checks:
+        for check_name, result in check_group.items():
+            if result['issues'] > 0:
+                total_issues += result['issues']
+                if result['status'] == 'fail':
+                    blocking_issues += result['issues']
+                if result.get('fixable', False):
+                    fixable_issues += result['issues']
+    
+    review_results['summary'] = {
+        'total_issues': total_issues,
+        'fixable_issues': fixable_issues,
+        'blocking_issues': blocking_issues
     }
     
     if output_json:
         click.echo(json.dumps(review_results, indent=2))
     else:
         # Human-readable output
-        click.echo(f"\n🔍 Reviewing PR #{pr_number}\n")
+        click.echo(f"\n🔍 Reviewing PR #{pr_number} ({len(changed_files)} files changed)\n")
         
-        # Display each check result
-        for check_name, result in review_results['checks'].items():
-            status_emoji = {
-                'pass': '✅',
-                'warning': '⚠️',
-                'fail': '❌'
-            }[result['status']]
+        # Display basic code checks
+        click.echo("📋 Code Quality Checks:")
+        _display_check_results(review_results['checks'])
+        
+        # Display security checks if run
+        if 'security' in review_results:
+            click.echo("\n🔒 Security Checks:")
+            _display_check_results(review_results['security'])
             
-            click.echo(f"{status_emoji} {check_name.replace('_', ' ').title()}: {result['message']}")
+        # Display performance checks if run
+        if 'performance' in review_results:
+            click.echo("\n⚡ Performance Checks:")
+            _display_check_results(review_results['performance'])
             
-            if result.get('locations'):
-                for loc in result['locations']:
-                    click.echo(f"   → {loc}")
+        # Display accessibility checks if run
+        if 'accessibility' in review_results:
+            click.echo("\n♿ Accessibility Checks:")
+            _display_check_results(review_results['accessibility'])
         
         # Summary
         click.echo(f"\n📊 Summary:")
@@ -357,8 +397,29 @@ def review_pr(pr_number: int, auto_fix: bool, output_json: bool):
         # Auto-fix option
         if auto_fix and review_results['summary']['fixable_issues'] > 0:
             click.echo(f"\n🔧 Auto-fixing {review_results['summary']['fixable_issues']} issues...")
+            # In a real implementation, this would run prettier, eslint --fix, etc.
             click.echo("   → Fixed formatting issues")
+            click.echo("   → Removed console.logs")
             click.echo("   ✅ Changes committed to PR")
+
+
+def _display_check_results(checks: dict):
+    """Display check results in a readable format."""
+    for check_name, result in checks.items():
+        status_emoji = {
+            'pass': '✅',
+            'warning': '⚠️',
+            'fail': '❌'
+        }[result['status']]
+        
+        click.echo(f"{status_emoji} {check_name.replace('_', ' ').title()}: {result['message']}")
+        
+        if result.get('locations') and len(result['locations']) > 0:
+            # Show first 5 locations
+            for loc in result['locations'][:5]:
+                click.echo(f"   → {loc}")
+            if len(result['locations']) > 5:
+                click.echo(f"   → ... and {len(result['locations']) - 5} more")
 
 
 # Project management

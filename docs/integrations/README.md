@@ -14,6 +14,12 @@ This directory contains documentation for integrating external services with the
 - Commands: create branches, create PRs
 - Direct integration via PyGithub
 
+### Meticulous.ai (In Development)
+- Automated testing through session recording
+- Captures user actions and network requests
+- See [Meticulous Integration](meticulous/README.md)
+- **Task**: [KEY-251](https://linear.app/team/issue/KEY-251)
+
 ## Adding New Integrations
 
 To add a new service integration:

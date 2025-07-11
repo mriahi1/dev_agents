@@ -100,8 +100,12 @@ class TestLinearCommands:
             comment='Starting work'
         )
 
-    def test_linear_list_missing_env(self, runner):
+    def test_linear_list_missing_env(self, runner, monkeypatch):
         """Test linear list with missing environment variables."""
+        # Clear the environment variables
+        monkeypatch.delenv('LINEAR_API_KEY', raising=False)
+        monkeypatch.delenv('LINEAR_TEAM_ID', raising=False)
+        
         result = runner.invoke(cli, ['linear', 'list'])
         assert result.exit_code == 0
         assert 'Error: Please set LINEAR_API_KEY and LINEAR_TEAM_ID in .env file' in result.output
@@ -178,8 +182,12 @@ class TestGitHubCommands:
         assert len(data) == 1
         assert data[0]['number'] == 1
 
-    def test_github_branch_missing_env(self, runner):
+    def test_github_branch_missing_env(self, runner, monkeypatch):
         """Test github command with missing environment variables."""
+        # Clear the environment variables
+        monkeypatch.delenv('GITHUB_TOKEN', raising=False)
+        monkeypatch.delenv('GITHUB_REPO', raising=False)
+        
         result = runner.invoke(cli, ['github', 'branch', 'test'])
         assert result.exit_code == 0
         assert 'Error: Please set GITHUB_TOKEN and GITHUB_REPO in .env file' in result.output
@@ -188,8 +196,13 @@ class TestGitHubCommands:
 class TestProjectCommands:
     """Test project management commands."""
 
-    def test_project_list_no_projects(self, runner):
+    def test_project_list_no_projects(self, runner, monkeypatch):
         """Test project list with no configured projects."""
+        # Clear all project-related environment variables
+        for key in ['KEYSY3_GITHUB_REPO', 'IMMO_GITHUB_REPO', 'BACKEND_GITHUB_REPO', 
+                    'TARGET_PROJECT', 'GITHUB_REPO']:
+            monkeypatch.delenv(key, raising=False)
+            
         result = runner.invoke(cli, ['project', 'list'])
         assert result.exit_code == 0
         assert 'No projects configured' in result.output
@@ -208,6 +221,11 @@ class TestProjectCommands:
 
     def test_project_list_json(self, runner, monkeypatch):
         """Test project list JSON output."""
+        # Clear any existing project env vars first
+        for key in ['KEYSY3_GITHUB_REPO', 'IMMO_GITHUB_REPO', 'BACKEND_GITHUB_REPO', 
+                    'TARGET_PROJECT', 'GITHUB_REPO']:
+            monkeypatch.delenv(key, raising=False)
+            
         monkeypatch.setenv('KEYSY3_GITHUB_REPO', 'owner/keysy3')
         monkeypatch.setenv('TARGET_PROJECT', 'keysy3')
 

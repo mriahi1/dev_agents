@@ -19,6 +19,19 @@ Overview of the current implementation and architecture.
 ### [Milestone Roadmap](milestone-roadmap.md)
 Future development plans and feature roadmap.
 
+## Learning System
+
+### [Learning Protocol](learnings/README.md)
+Systematic approach to capturing insights from each development iteration for continuous improvement.
+
+### [Quick Reference](learnings/quick-reference.md)
+Essential learnings and quick access to key workflows and checklists.
+
+### [Pre-PR Checklist](checklists/pre-pr-checklist.md)
+Comprehensive checklist to run through before creating any pull request.
+
+**Latest Learning**: Always target `staging` branch for PRs, never `main` directly. See [2025-07-11-KEY-251](learnings/2025-07-11-KEY-251.md).
+
 ## Architecture
 
 The toolkit follows a simple architecture:

@@ -18,8 +18,14 @@ def mock_github():
 def github_client(mock_github):
     """Create a GitHub client instance for testing."""
     mock_instance = Mock()
+    mock_repo = Mock()
+    mock_instance.get_repo.return_value = mock_repo
     mock_github.return_value = mock_instance
+    
     client = GitHubClient(token='test_token', repo='owner/repo')
+    # Force initialization of repo by calling _init_repo
+    client._init_repo()
+    
     return client
 
 
@@ -34,7 +40,15 @@ class TestGitHubClient:
         client = GitHubClient(token='test_token', repo='owner/repo')
         
         assert client.repo_name == 'owner/repo'
+        assert client.repo is None  # Should be None initially
         mock_github.assert_called_once_with('test_token')
+        
+        # Test lazy initialization
+        mock_repo = Mock()
+        mock_instance.get_repo.return_value = mock_repo
+        client._init_repo()
+        
+        assert client.repo == mock_repo
         mock_instance.get_repo.assert_called_once_with('owner/repo')
 
     def test_create_branch_success(self, github_client):
@@ -70,7 +84,7 @@ class TestGitHubClient:
         mock_base_ref.object.sha = 'def456'
         mock_repo.get_git_ref.return_value = mock_base_ref
         
-        result = github_client.create_branch('feature/test', base='staging')
+        result = github_client.create_branch('feature/test', base_branch='staging')
         
         assert result is True
         mock_repo.get_git_ref.assert_called_with('heads/staging')
@@ -82,7 +96,7 @@ class TestGitHubClient:
         mock_pr.number = 123
         mock_pr.html_url = 'https://github.com/owner/repo/pull/123'
         mock_repo.create_pull.return_value = mock_pr
-        
+    
         pr_number = github_client.create_pull_request(
             title='Test PR',
             body='Test description',
@@ -144,6 +158,8 @@ class TestGitHubClient:
         mock_pr1.user.login = 'user1'
         mock_pr1.created_at = datetime(2023, 1, 1)
         mock_pr1.html_url = 'https://github.com/owner/repo/pull/1'
+        mock_pr1.base.ref = 'main'
+        mock_pr1.head.ref = 'feature/test1'
         
         mock_pr2 = Mock()
         mock_pr2.number = 2
@@ -152,11 +168,14 @@ class TestGitHubClient:
         mock_pr2.user.login = 'user2'
         mock_pr2.created_at = datetime(2023, 1, 2)
         mock_pr2.html_url = 'https://github.com/owner/repo/pull/2'
+        mock_pr2.base.ref = 'main'
+        mock_pr2.head.ref = 'feature/test2'
         
-        mock_repo.get_pulls.return_value = [mock_pr1, mock_pr2]
+        # Mock both calls for open and closed PRs
+        mock_repo.get_pulls.side_effect = [[mock_pr1], [mock_pr2]]
         
         # Test list PRs
-        prs = github_client.list_pull_requests()
+        prs = github_client.list_pull_requests(state='all')
         
         assert len(prs) == 2
         assert prs[0]['number'] == 1
@@ -165,7 +184,10 @@ class TestGitHubClient:
         assert prs[1]['number'] == 2
         assert prs[1]['state'] == 'closed'
         
-        mock_repo.get_pulls.assert_called_once_with(state='all', sort='created', direction='desc')
+        # Should be called twice - once for open, once for closed
+        assert mock_repo.get_pulls.call_count == 2
+        mock_repo.get_pulls.assert_any_call(state='open')
+        mock_repo.get_pulls.assert_any_call(state='closed')
 
     def test_list_pull_requests_open_only(self, github_client):
         """Test listing only open pull requests."""
@@ -177,6 +199,8 @@ class TestGitHubClient:
         mock_pr.user.login = 'user1'
         mock_pr.created_at = datetime.now()
         mock_pr.html_url = 'https://github.com/owner/repo/pull/1'
+        mock_pr.base.ref = 'main'
+        mock_pr.head.ref = 'feature/test'
         
         mock_repo.get_pulls.return_value = [mock_pr]
         
@@ -185,7 +209,7 @@ class TestGitHubClient:
         assert len(prs) == 1
         assert prs[0]['state'] == 'open'
         
-        mock_repo.get_pulls.assert_called_once_with(state='open', sort='created', direction='desc')
+        mock_repo.get_pulls.assert_called_once_with(state='open')
 
     def test_create_or_update_file_new(self, github_client):
         """Test creating a new file."""
