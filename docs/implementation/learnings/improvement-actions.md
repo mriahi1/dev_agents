@@ -81,6 +81,24 @@ fi
 - [ ] Create tasks for missing UI components
 - [ ] Ensure data layer and UI layer are in sync
 
+### 6. CodeScene Integration
+**Source**: [2025-07-11-codescene-refactoring](./2025-07-11-codescene-refactoring.md)
+**Status**: 🔄 In Progress
+**Description**: Integrate CodeScene checks into development workflow
+
+**Action Items**:
+- [ ] Set up CodeScene CLI for local development
+- [ ] Add pre-commit hooks for code health checks
+- [ ] Extract remaining tabs from property detail page (1667 lines → <1000)
+- [ ] Create file size guidelines in development docs
+- [ ] Monitor CodeScene metrics in PR reviews
+
+**Key Metrics to Watch**:
+- File size (aim for <500 lines per component)
+- Brain Class detection
+- Nested complexity
+- Low cohesion warnings
+
 ## Completed Improvements
 
 ### Learning Protocol System
