@@ -52,6 +52,35 @@ fi
 4. Test fix in same environment as report
 5. Include reproduction steps in PR
 
+### 4. Bug Report Verification Template
+**Source**: [2025-07-11-KEY-252](./2025-07-11-KEY-252.md)
+**Status**: 🔄 In Progress
+**Description**: Improve bug reports to avoid miscommunication
+
+**Template Addition**:
+```markdown
+## Bug Report Checklist
+- [ ] Feature/Component exists in the UI
+- [ ] I can navigate to the feature
+- [ ] The issue is not that the feature is missing
+- [ ] Exact error or behavior described
+- [ ] Steps to reproduce included
+- [ ] Environment specified (local/preview/staging)
+```
+
+**Why**: KEY-252 was reported as "empty tab" but the tab didn't exist at all.
+
+### 5. UI Feature Audit
+**Source**: [2025-07-11-KEY-252](./2025-07-11-KEY-252.md)
+**Status**: 📋 Planned
+**Description**: Audit property detail page for other missing tabs
+
+**Action Items**:
+- [ ] List all data hooks that exist
+- [ ] Check which ones have UI implementations
+- [ ] Create tasks for missing UI components
+- [ ] Ensure data layer and UI layer are in sync
+
 ## Completed Improvements
 
 ### Learning Protocol System
