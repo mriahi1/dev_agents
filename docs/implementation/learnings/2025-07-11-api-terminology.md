@@ -1,60 +1,44 @@
-# Learning Entry: API Terminology Mapping
+# API Terminology Mapping: Property vs Operation
 
-**Date**: 2025-07-11  
-**Task**: KEY-252 (Leases Tab)  
-**Category**: API Design, Backend Integration
+## Date: 2025-07-11
+## Task: KEY-252 (Leases Tab Implementation)
 
-## Key Mapping: Property = Operation [[memory:2979217]]
+### Issue Discovered
+During implementation of the leases tab feature, discovered that the backend API uses different terminology than the frontend:
+- Frontend typically uses "property" to refer to properties
+- Backend API expects "operation" parameter when filtering by property
+- Lease objects store the property ID in the "operation" field
 
-In the keysy3 system, there's a critical terminology difference between frontend and backend:
+### Root Cause
+This is an intentional architectural decision where the backend uses more generic terminology that can accommodate different business contexts.
 
-- **Frontend**: Uses "property" (what users see)
-- **Backend API**: Uses "operation" (internal terminology)
+### Implementation Approach
+Initially implemented a conversion layer in the API service that translated 'property' to 'operation'. However, this added unnecessary complexity and confusion about where the conversion happened.
 
-### Examples
+**Updated approach**: Use 'operation' directly in frontend code when dealing with API calls, maintaining clarity about what the backend expects.
 
+### Code Example
 ```typescript
-// Frontend code refers to "property"
-const propertyId = 123;
+// In hooks that fetch leases by property:
+const [filters, setFilters] = useState<LeaseFilterParams>({
+  ...initialFilters,
+  operation: propertyId.toString(), // Use 'operation' directly - backend expectation
+});
 
-// But API expects "operation"
-GET /api/leases?operation=123  // ✅ Correct
-GET /api/leases?property=123   // ❌ Won't filter properly
-
-// In lease objects, property ID is stored as:
-lease.operation = 123;  // Not lease.property
-```
-
-### Code Implementation
-
-The `fetchLeases` function in `lease-service.ts` handles this mapping:
-
-```typescript
-// Handle property parameter - API uses 'operation' instead of 'property'
-// Frontend: property -> Backend: operation
-if (params.property && params.property !== 'all') {
-  // Convert 'property' to 'operation' for API compatibility
-  queryParams.append('operation', params.property);
+// In API service:
+if (params.operation && params.operation !== 'all') {
+  queryParams.append('operation', params.operation); // Direct pass-through, no conversion
 }
 ```
 
-### Impact Areas
-
-1. **Lease filtering** - Must use `operation` parameter
-2. **Tenant filtering** - May also use operation terminology
-3. **Unit filtering** - Check if similar mapping exists
-4. **Any property-related API calls** - Verify parameter naming
-
-### Debugging Tips
-
-If data appears empty when filtering by property:
-1. Check if API is receiving `operation` parameter
-2. Verify lease objects have `operation` field populated
-3. Ensure type matching (number vs string)
+### Key Learning
+When dealing with API terminology mismatches, consider:
+1. Using the API's terminology directly in API-related code for clarity
+2. Documenting the terminology difference clearly in comments
+3. Avoiding conversion layers that can add confusion about where transformations happen
 
 ### Action Items
-
-- [ ] Document all frontend/backend terminology mappings
-- [ ] Create a translation layer or constants file
-- [ ] Update API documentation to clarify this mapping
-- [ ] Consider standardizing terminology across the stack 
+- ✅ Updated lease hooks to use 'operation' directly
+- ✅ Removed conversion logic from API service
+- ✅ Added clear comments explaining the backend expectation
+- Consider standardizing terminology across frontend and backend in the future 
