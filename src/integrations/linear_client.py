@@ -19,6 +19,10 @@ class LinearClient:
     
     def get_ready_tasks(self, state: str = "Ready for Dev") -> List[LinearTask]:
         """Get tasks in specified state."""
+        return self.get_tasks(state)
+    
+    def get_tasks(self, state: str = "Ready for Dev") -> List[LinearTask]:
+        """Get tasks in specified state."""
         query = """
         query($teamId: ID!, $state: String!) {
             issues(
@@ -26,7 +30,7 @@ class LinearClient:
                     team: { id: { eq: $teamId } }
                     state: { name: { eq: $state } }
                 }
-                first: 50
+                first: 100
             ) {
                 nodes {
                     id
@@ -35,6 +39,12 @@ class LinearClient:
                     description
                     state { name }
                     labels { nodes { name } }
+                    priority
+                    estimate
+                    assignee { name email }
+                    creator { name email }
+                    createdAt
+                    updatedAt
                 }
             }
         }
@@ -58,7 +68,7 @@ class LinearClient:
                 return []
             
             issues = data.get("data", {}).get("issues", {}).get("nodes", [])
-            logger.info(f"Found {len(issues)} tasks from Linear")
+            logger.info(f"Found {len(issues)} tasks from Linear in state '{state}'")
             
             return [
                 LinearTask(
@@ -160,30 +170,36 @@ class LinearClient:
         self,
         task_id: str,
         state: Optional[str] = None,
-        comment: Optional[str] = None
+        comment: Optional[str] = None,
+        description: Optional[str] = None,
+        title: Optional[str] = None
     ) -> bool:
-        """Update a task's state and/or add a comment.
+        """Update a task's state, description, title and/or add a comment.
         
         Args:
             task_id: Task identifier (e.g., "KEY-123")
             state: New state name (e.g., "In Progress")
             comment: Comment to add
+            description: New description
+            title: New title
             
         Returns:
             True if successful, False otherwise
         """
         success = True
         
-        # Update state if provided
-        if state:
-            state_id = self._get_state_id(state)
-            if not state_id:
-                logger.error(f"Could not find state '{state}'")
-                return False
-            
-            success = self._update_task_state(task_id, state_id)
+        # Update issue fields if provided
+        if state or description or title:
+            success = self._update_issue_fields(task_id, state, description, title)
             if success:
-                logger.info(f"Successfully updated task state to {state}")
+                updates = []
+                if state:
+                    updates.append(f"state to {state}")
+                if description:
+                    updates.append("description")
+                if title:
+                    updates.append("title")
+                logger.info(f"Successfully updated {', '.join(updates)}")
         
         # Add comment if provided
         if comment and success:
@@ -192,6 +208,19 @@ class LinearClient:
                 logger.info("Successfully added comment")
         
         return success
+    
+    def update_task_description(self, task_id: str, description: str, title: Optional[str] = None) -> bool:
+        """Update a task's description and optionally title.
+        
+        Args:
+            task_id: Task identifier (e.g., "KEY-123")
+            description: New description
+            title: New title (optional)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.update_task(task_id, description=description, title=title)
     
     def _get_state_id(self, state_name: str) -> Optional[str]:
         """Get state ID from state name."""
@@ -302,6 +331,73 @@ class LinearClient:
             
         except Exception as e:
             logger.error(f"Error updating task state: {e}")
+            return False
+    
+    def _update_issue_fields(self, task_id: str, state: Optional[str] = None, 
+                           description: Optional[str] = None, title: Optional[str] = None) -> bool:
+        """Update multiple issue fields at once."""
+        # Build input object
+        input_fields = {}
+        
+        if state:
+            state_id = self._get_state_id(state)
+            if not state_id:
+                logger.error(f"Could not find state '{state}'")
+                return False
+            input_fields["stateId"] = state_id
+        
+        if description is not None:
+            input_fields["description"] = description
+            
+        if title is not None:
+            input_fields["title"] = title
+        
+        if not input_fields:
+            logger.warning("No fields to update")
+            return True
+        
+        mutation = """
+        mutation($issueId: String!, $input: IssueUpdateInput!) {
+            issueUpdate(
+                id: $issueId,
+                input: $input
+            ) {
+                success
+                issue {
+                    id
+                    identifier
+                    title
+                    description
+                    state { name }
+                }
+            }
+        }
+        """
+        
+        try:
+            response = requests.post(
+                self.base_url,
+                json={
+                    "query": mutation,
+                    "variables": {
+                        "issueId": task_id,
+                        "input": input_fields
+                    }
+                },
+                headers={"Authorization": self.api_key}
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if "errors" in data:
+                logger.error(f"Failed to update issue: {data['errors']}")
+                return False
+                
+            return data.get("data", {}).get("issueUpdate", {}).get("success", False)
+            
+        except Exception as e:
+            logger.error(f"Error updating issue: {e}")
             return False
     
     def _add_comment(self, task_id: str, comment: str) -> bool:

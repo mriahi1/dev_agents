@@ -37,19 +37,11 @@ def validate_translation_files() -> Tuple[bool, List[str]]:
     """Validate translation files consistency."""
     issues = []
     
-    # Find projects directory
-    projects_dir = Path("./projects")
-    if not projects_dir.exists():
-        issues.append("❌ Projects directory not found")
+    # Find locales directory (we're already in the keysy3 project)
+    locales_dir = Path("./public/locales")
+    if not locales_dir.exists():
+        issues.append("❌ public/locales directory not found")
         return False, issues
-    
-    # Find locales directory
-    locales_dirs = list(projects_dir.rglob("public/locales"))
-    if not locales_dirs:
-        issues.append("❌ No public/locales directory found")
-        return False, issues
-    
-    locales_dir = locales_dirs[0]
     
     # Get available languages
     languages = [d.name for d in locales_dir.iterdir() if d.is_dir()]
@@ -143,12 +135,8 @@ def find_hardcoded_text() -> Tuple[bool, List[str]]:
     """Find hardcoded text that should be translated."""
     issues = []
     
-    # Find TSX/TS files in projects
-    projects_dir = Path("./projects")
-    if not projects_dir.exists():
-        return True, []
-    
-    tsx_files = list(projects_dir.rglob("*.tsx")) + list(projects_dir.rglob("*.ts"))
+    # Find TSX/TS files in current directory (we're in keysy3)
+    tsx_files = list(Path('.').rglob("*.tsx")) + list(Path('.').rglob("*.ts"))
     tsx_files = [f for f in tsx_files if "node_modules" not in str(f)]
     
     print(f"\n🔍 Scanning {len(tsx_files)} TypeScript files for hardcoded text")

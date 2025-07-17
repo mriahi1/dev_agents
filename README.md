@@ -2,6 +2,17 @@
 
 An autonomous development toolkit for software engineering tasks with integrated Linear workflow management and comprehensive translation system.
 
+## 🏗️ **Repository Purpose & Navigation**
+
+**⚠️ CRITICAL**: This repository contains **documentation, tools, and integrations** - NOT the frontend application.
+
+| Repository | Purpose | Location | Use For |
+|------------|---------|----------|---------|
+| **`dev_agents`** | 📚 Toolkit & Documentation | `/Projects/dev_agents` | Learning entries, CLI tools, Linear integration |
+| **`keysy3`** | 🚀 Frontend Application | `/Projects/keysy/keysy3` | React components, UI features, property pages |
+
+**Before implementing any feature**: [📋 Follow the Implementation Workflow Guide](docs/guides/cursor-implementation-workflow.md)
+
 ## 🎯 **Recent Major Implementations**
 
 ### **Translation System Standardization** ✅ **COMPLETED**

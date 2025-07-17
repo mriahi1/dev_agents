@@ -7,6 +7,9 @@ export {
   usePropertyData,
 } from './property-context';
 
+// Property Tab Components
+export { PropertyFinancialsTab } from './property-financials-tab';
+
 // =============================================================================
 // CORE TYPE EXPORTS (organized by category)
 // =============================================================================
