@@ -9,6 +9,7 @@ export {
 
 // Property Tab Components
 export { PropertyFinancialsTab } from './property-financials-tab';
+export { PropertyTasksTab } from './property-tasks-tab';
 
 // =============================================================================
 // CORE TYPE EXPORTS (organized by category)
