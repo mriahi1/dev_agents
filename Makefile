@@ -1,62 +1,69 @@
-.PHONY: help setup install test clean lint format run cli
+# Cursor DevOps Toolkit Makefile
 
-# Default target
-help:
-	@echo "Cursor DevOps Toolkit"
-	@echo ""
-	@echo "Available commands:"
-	@echo "  make setup    - Create virtual environment and install dependencies"
-	@echo "  make install  - Install the toolkit as a command"
-	@echo "  make test     - Run tests"
-	@echo "  make lint     - Run linting"
-	@echo "  make format   - Format code"
-	@echo "  make clean    - Clean up generated files"
-	@echo ""
-	@echo "Usage examples:"
-	@echo "  python -m src.main linear list"
-	@echo "  python -m src.main github pr create --help"
+.PHONY: install verify test run-dry run clean lint format type-check help verify-repo
 
-# Setup virtual environment
-setup:
-	@echo "🔧 Setting up virtual environment..."
-	python3 -m venv venv
-	./venv/bin/pip install --upgrade pip
-	./venv/bin/pip install -r requirements.txt
-	@echo "✅ Setup complete!"
-	@echo ""
-	@echo "Activate with: source venv/bin/activate"
+# Installation
+install:
+	pip install -e .
 
-# Install as editable package
-install: setup
-	@echo "📦 Installing toolkit..."
-	./venv/bin/pip install -e .
-	@echo "✅ Toolkit installed!"
+# Repository verification (CRITICAL SAFETY)
+verify-repo:
+	@echo "🔍 Running mandatory repository verification..."
+	@bash scripts/verify_repository.sh
 
-# Run tests
-test:
-	@echo "🧪 Running tests..."
-	./venv/bin/pytest tests/ -v
+# Verification and validation
+verify: verify-repo
+	python scripts/verify_setup.py
 
-# Linting
+# Testing
+test: verify-repo
+	pytest tests/ -v
+
+# Development
+run-dry: verify-repo
+	@echo "🧪 Running in dry-run mode..."
+	python -m src.main --dry-run
+
+run: verify-repo
+	@echo "🚀 Running toolkit..."
+	python -m src.main
+
+# Code quality
 lint:
-	@echo "🔍 Running linting..."
-	./venv/bin/mypy src/
-	./venv/bin/flake8 src/ tests/
+	flake8 src/ tests/
+	black --check src/ tests/
 
-# Format code
 format:
-	@echo "✨ Formatting code..."
-	./venv/bin/black src/ tests/
+	black src/ tests/
 
-# Clean up
+type-check:
+	mypy src/
+
+# Cleanup
 clean:
-	@echo "🧹 Cleaning up..."
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
-	rm -rf .pytest_cache
-	rm -rf .mypy_cache
-	rm -rf *.egg-info
+	rm -rf .pytest_cache/
+	rm -rf *.egg-info/
 
-# Quick access to CLI
-cli:
-	@python -m src.main 
+# Help
+help:
+	@echo "🛠️  Cursor DevOps Toolkit"
+	@echo ""
+	@echo "📍 CRITICAL SAFETY:"
+	@echo "  verify-repo    Run repository verification (MANDATORY before any work)"
+	@echo ""
+	@echo "🚀 Core Commands:"
+	@echo "  install        Install the toolkit in development mode"
+	@echo "  verify         Run all verification checks"
+	@echo "  test           Run the test suite"
+	@echo "  run-dry        Run in dry-run mode (safe testing)"
+	@echo "  run            Run the toolkit"
+	@echo ""
+	@echo "🔧 Development:"
+	@echo "  lint           Run code linting"
+	@echo "  format         Auto-format code"
+	@echo "  type-check     Run type checking"
+	@echo "  clean          Clean up generated files"
+	@echo ""
+	@echo "⚠️  ALWAYS run 'make verify-repo' before any coding work!" 

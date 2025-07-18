@@ -45,6 +45,22 @@ cp env.example .env
 # Edit .env with your API keys and configuration
 ```
 
+## 🚨 Critical Safety: Repository Verification
+
+**MANDATORY**: Before any coding work, verify you're in the correct repository:
+
+```bash
+make verify-repo    # MANDATORY: Run before any file creation
+```
+
+**See**: [Repository Verification Integration Guide](docs/implementation/REPOSITORY-VERIFICATION-INTEGRATION.md)
+
+### Quick Commands
+- `rc` - Check current repository
+- `gk` - Go to keysy3 (React work)
+- `gd` - Go to dev_agents (Python work)
+- `st <file>` - Safe file creation with verification
+
 ## 🔧 Core Commands
 
 ### Linear Integration

@@ -1,0 +1,86 @@
+# Dev Agents Repository - Cursor Rules
+
+## CRITICAL REPOSITORY VERIFICATION
+
+🚨 **MANDATORY FIRST STEP**: Before ANY code work, you MUST verify repository context.
+
+### Repository Identity
+- **Project Type**: Python DevOps Toolkit
+- **Purpose**: CLI tools for Linear, GitHub, and DevOps operations
+- **File Types**: `.py`, `.md`, `.txt`, `.sh`
+- **Dependencies**: `requirements.txt`
+
+### FORBIDDEN in This Repository
+❌ **NEVER create React/Frontend files**: `.tsx`, `.ts`, `.jsx`, `.js` components
+❌ **NEVER create**: `package.json`, `node_modules/`, Next.js files
+❌ **NEVER create**: Frontend components, UI elements, React hooks
+
+### Required Verification Workflow
+Before ANY file creation or modification:
+
+```bash
+# 1. MANDATORY: Run repository verification
+make verify-repo
+
+# 2. MANDATORY: Verify you're in correct repository
+pwd  # Should be: /Users/maximeriahi/Projects/dev_agents
+ls -la  # Should see: requirements.txt (NOT package.json)
+
+# 3. For React/Frontend work, navigate to:
+cd projects/keysy3/
+```
+
+### Emergency Stop Conditions
+If you find yourself:
+- Creating `.tsx/.ts` files here → STOP and run `make verify-repo`
+- Looking for `package.json` → STOP, you're in wrong repository
+- Working on React components → STOP, navigate to `projects/keysy3/`
+
+### Memory Integration
+Check memory ID 3542730 for critical repository confusion prevention protocols.
+
+### File Types Allowed in This Repository
+✅ **Python**: `.py` files for CLI tools and integrations
+✅ **Documentation**: `.md` files for project documentation
+✅ **Configuration**: `.txt`, `.env`, `.yml` files
+✅ **Scripts**: `.sh` bash scripts for automation
+
+## Development Principles
+
+### 1. CLI-First Design
+- Build simple, composable command-line tools
+- Each command does one thing well
+- Follow Unix philosophy
+
+### 2. Type Safety
+- Use type hints for all Python functions
+- Validate inputs with pydantic
+- Handle errors gracefully
+
+### 3. Integration Focus
+- Linear API integration
+- GitHub API integration
+- Simple, reliable operations
+
+### 4. Testing
+- Write tests for all CLI commands
+- Use pytest for testing framework
+- Mock external API calls
+
+## Common Commands
+
+```bash
+# Development workflow
+make verify-repo    # ALWAYS run first
+make install       # Install toolkit
+make test          # Run tests
+make lint          # Code quality
+make run-dry       # Safe testing
+
+# CLI usage
+python -m src.main linear list
+python -m src.main github pr create
+```
+
+## Remember
+This is a **Python DevOps toolkit**, NOT a React frontend. For React work, use `projects/keysy3/`. 
